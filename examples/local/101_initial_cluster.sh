@@ -26,6 +26,8 @@ source "${script_root}/env.sh"
 # start topo server
 if [ "${TOPO}" = "zk2" ]; then
     CELL=zone1 "$script_root/zk-up.sh"
+elif [ "${TOPO}" = "k8s" ]; then
+    CELL=zone1 "$script_root/k3s-up.sh"
 else
     CELL=zone1 "$script_root/etcd-up.sh"
 fi

@@ -32,6 +32,8 @@ done;
 
 if [ "${TOPO}" = "zk2" ]; then
     CELL=zone1 "$script_root/zk-down.sh"
+elif [ "${TOPO}" = "k8s" ]; then
+    CELL=zone1 "$script_root/k3s-down.sh"
 else
     CELL=zone1 "$script_root/etcd-down.sh"
 fi
