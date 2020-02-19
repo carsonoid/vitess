@@ -36,13 +36,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"vitess.io/vitess/go/vt/log"
 	"vitess.io/vitess/go/vt/topo"
+	vtv1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/apis/topo/v1beta1"
+	vtkube "vitess.io/vitess/go/vt/topo/kubernetestopo/client/clientset/versioned"
+	vttyped "vitess.io/vitess/go/vt/topo/kubernetestopo/client/clientset/versioned/typed/topo/v1beta1"
 )
 
 var (
@@ -71,8 +73,11 @@ type Server struct {
 	// kubeClient is the entire kubernetes interface
 	kubeClient kubernetes.Interface
 
+	// vtKubeClient is the client for vitess api types
+	vtKubeClient vtkube.Interface
+
 	// resource is a scoped-down kubernetes.Interface used for convenience
-	resourceClient v1.ConfigMapInterface
+	resourceClient vttyped.VitessTopoNodeInterface
 
 	// stopChan is used to tell the client-go informers to quit
 	stopChan chan struct{}
@@ -117,14 +122,14 @@ func indexByParent(obj interface{}) ([]string, error) {
 // syncTree starts and syncs the member objects that form the directory "tree"
 func (s *Server) syncTree() error {
 	// Create the informer / indexer
-	restClient := s.kubeClient.CoreV1().RESTClient()
-	listwatch := cache.NewListWatchFromClient(restClient, "configmaps", s.namespace, fields.Everything())
+	restClient := s.vtKubeClient.Discovery().RESTClient()
+	listwatch := cache.NewListWatchFromClient(restClient, "vitesstoponode", s.namespace, fields.Everything())
 
 	// set up index funcs
 	indexers := cache.Indexers{}
 	indexers["by_parent"] = indexByParent
 
-	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &corev1.ConfigMap{}, 0,
+	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &vtv1beta1.VitessTopoNode{}, 0,
 		cache.ResourceEventHandlerFuncs{}, indexers)
 
 	// Start indexer
@@ -161,7 +166,12 @@ func NewServer(serverAddr, root string) (*Server, error) {
 	// create the kubernetes client
 	kubeClientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Kubernetes client: %s", err)
+		return nil, fmt.Errorf("error creating official Kubernetes client: %s", err)
+	}
+
+	vtKubeClientset, err := vtkube.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating vitess Kubernetes client: %s", err)
 	}
 
 	// Create the server
@@ -169,7 +179,8 @@ func NewServer(serverAddr, root string) (*Server, error) {
 	s := &Server{
 		namespace:      namespace,
 		kubeClient:     kubeClientset,
-		resourceClient: kubeClientset.CoreV1().ConfigMaps(namespace),
+		vtKubeClient:   vtKubeClientset,
+		resourceClient: vtKubeClientset.TopoV1beta1().VitessTopoNodes(namespace),
 		root:           root,
 		stopChan:       make(chan struct{}),
 	}

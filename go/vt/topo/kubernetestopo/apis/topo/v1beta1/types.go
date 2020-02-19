@@ -10,13 +10,7 @@ type VitessTopoNode struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Data VitessTopoNodeData `json:"data"`
-}
-
-// VitessTopoNodeData contains the basic data for the node
-type VitessTopoNodeData struct {
-	Key   string `json:"key"`
-	Value string `json:"key"`
+	Data              VitessTopoNodeData `json:"data"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -28,4 +22,10 @@ type VitessTopoNodeList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []VitessTopoNode `json:"items"`
+}
+
+// VitessTopoNodeData contains the basic data for the node
+type VitessTopoNodeData struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }

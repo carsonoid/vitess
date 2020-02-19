@@ -19,13 +19,14 @@ limitations under the License.
 package fake
 
 import (
-	clientset "go/pkg/client/clientset/versioned"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
+	clientset "vitess.io/vitess/go/vt/topo/kubernetestopo/client/clientset/versioned"
+	topov1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/client/clientset/versioned/typed/topo/v1beta1"
+	faketopov1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/client/clientset/versioned/typed/topo/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -74,3 +75,8 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// TopoV1beta1 retrieves the TopoV1beta1Client
+func (c *Clientset) TopoV1beta1() topov1beta1.TopoV1beta1Interface {
+	return &faketopov1beta1.FakeTopoV1beta1{Fake: &c.Fake}
+}

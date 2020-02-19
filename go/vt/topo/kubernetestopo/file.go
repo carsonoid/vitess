@@ -32,6 +32,7 @@ import (
 
 	"vitess.io/vitess/go/vt/log"
 	"vitess.io/vitess/go/vt/topo"
+	vtv1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/apis/topo/v1beta1"
 )
 
 // NodeReference contains the data relating to a node
@@ -42,10 +43,10 @@ type NodeReference struct {
 }
 
 // ToData converts a nodeReference to the data type used in the ConfigMap
-func (n *NodeReference) ToData() map[string]string {
-	return map[string]string{
-		"key":   n.key,
-		"value": base64.StdEncoding.EncodeToString([]byte(n.value)),
+func (n *NodeReference) ToData() vtv1beta1.VitessTopoNodeData {
+	return vtv1beta1.VitessTopoNodeData{
+		Key:   n.key,
+		Value: base64.StdEncoding.EncodeToString([]byte(n.value)),
 	}
 }
 
@@ -66,14 +67,14 @@ func (s *Server) newNodeReference(key string) *NodeReference {
 	return node
 }
 
-func (s *Server) buildFileResource(filePath string, contents []byte) *corev1.ConfigMap {
+func (s *Server) buildFileResource(filePath string, contents []byte) *vtv1beta1.VitessTopoNode {
 	node := s.newNodeReference(filePath)
 
 	// create data
 	node.value = string(contents)
 
 	// Create "file" object
-	return &corev1.ConfigMap{
+	return &vtv1beta1.VitessTopoNode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      node.id,
 			Namespace: s.namespace,
@@ -124,7 +125,7 @@ func (s *Server) Update(ctx context.Context, filePath string, contents []byte, v
 	}
 
 	// set new contents
-	result.Data["value"] = resource.Data["value"]
+	result.Data.Value = resource.Data.Value
 
 	// get result or err
 	final, err := s.resourceClient.Update(result)
@@ -152,12 +153,7 @@ func (s *Server) Get(ctx context.Context, filePath string) ([]byte, topo.Version
 		return []byte{}, nil, convertError(err, filePath)
 	}
 
-	c, hasContents := result.Data["value"]
-	if !hasContents {
-		return []byte{}, nil, convertError(fmt.Errorf("object found but has no contents"), filePath)
-	}
-
-	out, err := base64.StdEncoding.DecodeString(c)
+	out, err := base64.StdEncoding.DecodeString(result.Data.Value)
 	if err != nil {
 		return []byte{}, nil, convertError(fmt.Errorf("unable to decode object contents"), filePath)
 	}

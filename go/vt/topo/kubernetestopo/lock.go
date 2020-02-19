@@ -73,7 +73,7 @@ func (s *Server) lock(ctx context.Context, nodePath, contents string, createMiss
 	return &kubernetesLockDescriptor{
 		s:         s,
 		leaseID:   resource.Name,
-		leasePath: resource.Data["key"],
+		leasePath: resource.Data.Key,
 	}, nil
 }
 
