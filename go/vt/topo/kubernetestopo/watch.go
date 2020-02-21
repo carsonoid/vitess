@@ -96,7 +96,7 @@ func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <
 				changes <- &topo.WatchData{Err: topo.NewError(topo.NoNode, vtn.Name)}
 				close(gracefulShutdown)
 			},
-		}, cache.Indexers{})
+		}, indexers)
 
 	// create control chan for informer and start it
 	informerChan := make(chan struct{})
