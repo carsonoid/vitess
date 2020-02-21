@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var SchemeGroupVersion = schema.GroupVersion{Group: "topo.vitess.io", Version: "v1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: "topo.vitess.io", Version: "v1beta1"}
 
 var (
 	SchemeBuilder      runtime.SchemeBuilder

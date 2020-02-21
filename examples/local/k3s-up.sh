@@ -35,6 +35,9 @@ sleep 15
 # Use k3s built-in kubectl with custom config
 KUBECTL="k3s kubectl --kubeconfig=${K8S_KUBECONFIG}"
 
+# Create the CRD for vitesstopologynodes
+$KUBECTL create -f ../../go/vt/topo/kubernetestopo/VitessTopoNodes-crd.yaml
+
 # Add the CellInfo description for the cell
 set +e
 echo "add $cell CellInfo"

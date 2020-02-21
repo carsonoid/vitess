@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -29,7 +28,9 @@ import (
 
 	"testing"
 
-	"k8s.io/client-go/kubernetes"
+	extensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
 
 	topodatapb "vitess.io/vitess/go/vt/proto/topodata"
@@ -89,14 +90,25 @@ func TestKubernetesTopo(t *testing.T) {
 			continue
 		}
 
-		clientset, err := kubernetes.NewForConfig(config)
+		// Create the vitesstoponode crd
+		apiextensionsClientSet, err := apiextensionsclient.NewForConfig(config)
 		if err != nil {
-			log.Fatal("Invalid kubeconfig", config)
+			t.Fatal(err)
 		}
 
-		_, err = clientset.ServerVersion()
+		crdFile, err := os.Open("./VitessTopoNodes-crd.yaml")
+		defer crdFile.Close()
 		if err != nil {
-			t.Log(err)
+			t.Fatal(err)
+		}
+
+		crd := &extensionsv1.CustomResourceDefinition{}
+
+		kubeyaml.NewYAMLOrJSONDecoder(crdFile, 2048).Decode(crd)
+
+		_, err = apiextensionsClientSet.ApiextensionsV1().CustomResourceDefinitions().Create(crd)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		break

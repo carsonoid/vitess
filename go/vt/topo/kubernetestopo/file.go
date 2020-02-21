@@ -26,7 +26,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,7 +41,7 @@ type NodeReference struct {
 	value string
 }
 
-// ToData converts a nodeReference to the data type used in the ConfigMap
+// ToData converts a nodeReference to the data type used in the VitessTopoNode
 func (n *NodeReference) ToData() vtv1beta1.VitessTopoNodeData {
 	return vtv1beta1.VitessTopoNodeData{
 		Key:   n.key,
@@ -201,7 +200,7 @@ func (s *Server) Delete(ctx context.Context, filePath string, version topo.Versi
 		if !ok { // deleted from cache
 			break
 		}
-		cached := obj.(*corev1.ConfigMap)
+		cached := obj.(*vtv1beta1.VitessTopoNode)
 		if cached.GetUID() != current.GetUID() {
 			break // deleted and recreated
 		}

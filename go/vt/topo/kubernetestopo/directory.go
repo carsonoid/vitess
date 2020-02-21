@@ -23,10 +23,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"vitess.io/vitess/go/vt/log"
 	"vitess.io/vitess/go/vt/topo"
+	vtv1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/apis/topo/v1beta1"
 )
 
 // ListDir is part of the topo.Conn interface.
@@ -41,39 +40,36 @@ func (s *Server) ListDir(ctx context.Context, dirPath string, full bool) ([]topo
 
 	if children, err := s.memberIndexer.ByIndex("by_parent", dirPath); err == nil {
 		for _, obj := range children {
-			m := obj.(*corev1.ConfigMap)
-			if key, ok := m.Data["key"]; ok {
-				// skip duplicates
-				if _, ok := dirMap[key]; ok {
-					continue
-				}
+			key := obj.(*vtv1beta1.VitessTopoNode).Data.Key
 
-				// new empty entry
-				e := topo.DirEntry{}
-
-				// Clean dirPath from key to get name
-				key = strings.TrimPrefix(key, dirPath+"/")
-
-				// If the key represents a directory
-				if strings.Contains(key, "/") {
-					if full {
-						e.Type = topo.TypeDirectory
-					}
-
-					// get first part of path as name
-					key = strings.Split(filepath.Dir(key), "/")[0]
-				} else if full {
-					e.Type = topo.TypeFile
-				}
-
-				// set name
-				e.Name = key
-
-				// add to results
-				dirMap[e.Name] = e
-			} else {
-				log.Warningf("invalid ConfigMap in index")
+			// skip duplicates
+			if _, ok := dirMap[key]; ok {
+				continue
 			}
+
+			// new empty entry
+			e := topo.DirEntry{}
+
+			// Clean dirPath from key to get name
+			key = strings.TrimPrefix(key, dirPath+"/")
+
+			// If the key represents a directory
+			if strings.Contains(key, "/") {
+				if full {
+					e.Type = topo.TypeDirectory
+				}
+
+				// get first part of path as name
+				key = strings.Split(filepath.Dir(key), "/")[0]
+			} else if full {
+				e.Type = topo.TypeFile
+			}
+
+			// set name
+			e.Name = key
+
+			// add to results
+			dirMap[e.Name] = e
 		}
 	} else {
 		return nil, err

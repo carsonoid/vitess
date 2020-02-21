@@ -33,7 +33,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -97,11 +96,10 @@ type Server struct {
 }
 
 // Close implements topo.Server.Close.
-// It will nil out the global and cells fields, so any attempt to
-// re-use this server will panic.
 func (s *Server) Close() {
 	close(s.stopChan)
 }
+
 func getKeyParents(key string) []string {
 	parents := []string{""}
 	parent := []string{}
@@ -113,17 +111,14 @@ func getKeyParents(key string) []string {
 }
 
 func indexByParent(obj interface{}) ([]string, error) {
-	if key, ok := obj.(*corev1.ConfigMap).Data["key"]; ok {
-		return getKeyParents(key), nil
-	}
-	return []string{""}, nil
+	return getKeyParents(obj.(*vtv1beta1.VitessTopoNode).Data.Key), nil
 }
 
 // syncTree starts and syncs the member objects that form the directory "tree"
 func (s *Server) syncTree() error {
 	// Create the informer / indexer
-	restClient := s.vtKubeClient.Discovery().RESTClient()
-	listwatch := cache.NewListWatchFromClient(restClient, "vitesstoponode", s.namespace, fields.Everything())
+	restClient := s.vtKubeClient.TopoV1beta1().RESTClient()
+	listwatch := cache.NewListWatchFromClient(restClient, "vitesstoponodes", s.namespace, fields.Everything())
 
 	// set up index funcs
 	indexers := cache.Indexers{}

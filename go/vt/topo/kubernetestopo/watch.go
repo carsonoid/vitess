@@ -20,12 +20,12 @@ import (
 	"encoding/base64"
 
 	"golang.org/x/net/context"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/cache"
 
 	"vitess.io/vitess/go/vt/log"
 	"vitess.io/vitess/go/vt/topo"
+	vtv1beta1 "vitess.io/vitess/go/vt/topo/kubernetestopo/apis/topo/v1beta1"
 )
 
 // Watch is part of the topo.Conn interface.
@@ -56,40 +56,40 @@ func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <
 	gracefulShutdown := make(chan struct{})
 
 	// Create the informer / indexer to watch the single resource
-	restClient := s.kubeClient.CoreV1().RESTClient()
-	listwatch := cache.NewListWatchFromClient(restClient, "configmaps", s.namespace, fields.OneTermEqualSelector("metadata.name", s.buildFileResource(filePath, []byte{}).Name))
+	restClient := s.vtKubeClient.TopoV1beta1().RESTClient()
+	listwatch := cache.NewListWatchFromClient(restClient, "vitesstoponodes", s.namespace, fields.OneTermEqualSelector("metadata.name", s.buildFileResource(filePath, []byte{}).Name))
 
-	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &corev1.ConfigMap{}, 0,
+	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &vtv1beta1.VitessTopoNode{}, 0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				cm := obj.(*corev1.ConfigMap)
-				out, err := base64.StdEncoding.DecodeString(cm.Data["value"])
+				vtn := obj.(*vtv1beta1.VitessTopoNode)
+				out, err := base64.StdEncoding.DecodeString(vtn.Data.Value)
 				if err != nil {
 					changes <- &topo.WatchData{Err: err}
 					close(gracefulShutdown)
 				} else {
 					changes <- &topo.WatchData{
 						Contents: out,
-						Version:  KubernetesVersion(cm.GetResourceVersion()),
+						Version:  KubernetesVersion(vtn.GetResourceVersion()),
 					}
 				}
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				cm := newObj.(*corev1.ConfigMap)
-				out, err := base64.StdEncoding.DecodeString(cm.Data["value"])
+				vtn := newObj.(*vtv1beta1.VitessTopoNode)
+				out, err := base64.StdEncoding.DecodeString(vtn.Data.Value)
 				if err != nil {
 					changes <- &topo.WatchData{Err: err}
 					close(gracefulShutdown)
 				} else {
 					changes <- &topo.WatchData{
 						Contents: out,
-						Version:  KubernetesVersion(cm.GetResourceVersion()),
+						Version:  KubernetesVersion(vtn.GetResourceVersion()),
 					}
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				cm := obj.(*corev1.ConfigMap)
-				changes <- &topo.WatchData{Err: topo.NewError(topo.NoNode, cm.Name)}
+				vtn := obj.(*vtv1beta1.VitessTopoNode)
+				changes <- &topo.WatchData{Err: topo.NewError(topo.NoNode, vtn.Name)}
 				close(gracefulShutdown)
 			},
 		}, cache.Indexers{})
