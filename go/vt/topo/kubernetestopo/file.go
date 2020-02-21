@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 
 	"vitess.io/vitess/go/vt/log"
 	"vitess.io/vitess/go/vt/topo"
@@ -108,37 +109,49 @@ func (s *Server) Update(ctx context.Context, filePath string, contents []byte, v
 
 	resource := s.buildFileResource(filePath, contents)
 
-	result, err := s.resourceClient.Get(resource.Name, metav1.GetOptions{})
-	if err != nil && errors.IsNotFound(err) && version == nil {
-		// Update should create objects when the version is nil and the object is not found
-		result, err := s.resourceClient.Create(resource)
-		if err != nil {
-			return nil, convertError(err, filePath)
+	var finalVersion KubernetesVersion
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		result, err := s.resourceClient.Get(resource.Name, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) && version == nil {
+			// Update should create objects when the version is nil and the object is not found
+			createdVersion, err := s.Create(ctx, filePath, contents)
+			if err != nil {
+				return err
+			}
+			finalVersion = KubernetesVersion(createdVersion.String())
+			return nil
 		}
-		return KubernetesVersion(result.GetResourceVersion()), nil
-	}
 
-	// If a non-nil version is given to update, fail on mismatched version
-	if version != nil && KubernetesVersion(result.GetResourceVersion()) != version {
-		return nil, topo.NewError(topo.BadVersion, filePath)
-	}
+		// If a non-nil version is given to update, fail on mismatched version
+		if version != nil && KubernetesVersion(result.GetResourceVersion()) != version {
+			return topo.NewError(topo.BadVersion, filePath)
+		}
 
-	// set new contents
-	result.Data.Value = resource.Data.Value
+		// set new contents
+		result.Data.Value = resource.Data.Value
 
-	// get result or err
-	final, err := s.resourceClient.Update(result)
+		// get result or err
+		final, err := s.resourceClient.Update(result)
+		if err != nil {
+			return convertError(err, filePath)
+		}
+
+		// Update the internal cache
+		err = s.memberIndexer.Update(final)
+		if err != nil {
+			return convertError(err, filePath)
+		}
+
+		finalVersion = KubernetesVersion(final.GetResourceVersion())
+
+		return nil
+	})
 	if err != nil {
-		return nil, convertError(err, filePath)
+		return nil, err
 	}
 
-	// Update the internal cache
-	err = s.memberIndexer.Update(final)
-	if err != nil {
-		return nil, convertError(err, filePath)
-	}
-
-	return KubernetesVersion(final.GetResourceVersion()), nil
+	return finalVersion, nil
 }
 
 // Get is part of the topo.Conn interface.

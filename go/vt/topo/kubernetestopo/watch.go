@@ -30,7 +30,7 @@ import (
 
 // Watch is part of the topo.Conn interface.
 func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <-chan *topo.WatchData, topo.CancelFunc) {
-	log.Info("Starting Kubernetes topo Watch")
+	log.Info("Starting Kubernetes topo Watch on ", filePath)
 
 	current := &topo.WatchData{}
 
@@ -58,6 +58,10 @@ func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <
 	// Create the informer / indexer to watch the single resource
 	restClient := s.vtKubeClient.TopoV1beta1().RESTClient()
 	listwatch := cache.NewListWatchFromClient(restClient, "vitesstoponodes", s.namespace, fields.OneTermEqualSelector("metadata.name", s.buildFileResource(filePath, []byte{}).Name))
+
+	// set up index funcs
+	indexers := cache.Indexers{}
+	indexers["by_parent"] = indexByParent
 
 	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &vtv1beta1.VitessTopoNode{}, 0,
 		cache.ResourceEventHandlerFuncs{
