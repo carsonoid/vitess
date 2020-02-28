@@ -63,7 +63,7 @@ func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <
 	indexers := cache.Indexers{}
 	indexers["by_parent"] = indexByParent
 
-	s.memberIndexer, s.memberInformer = cache.NewIndexerInformer(listwatch, &vtv1beta1.VitessTopoNode{}, 0,
+	_, memberInformer := cache.NewIndexerInformer(listwatch, &vtv1beta1.VitessTopoNode{}, 0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				vtn := obj.(*vtv1beta1.VitessTopoNode)
@@ -100,7 +100,7 @@ func (s *Server) Watch(ctx context.Context, filePath string) (*topo.WatchData, <
 
 	// create control chan for informer and start it
 	informerChan := make(chan struct{})
-	go s.memberInformer.Run(informerChan)
+	go memberInformer.Run(informerChan)
 
 	// Handle interrupts
 	go closeOnDone(watchCtx, filePath, informerChan, gracefulShutdown, changes)
